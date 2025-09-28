@@ -1,72 +1,108 @@
-import swe from 'sweph';
+// calculateCusps.js
+// Módulo para cálculo das cúspides usando 'sweph'.
 
-function dmsToDec(degrees, minutes, seconds, direction) {
-    let dec = degrees + minutes / 60 + seconds / 3600;
-    if (direction === 'S' || direction === 'W') {
-        dec = -dec;
-    }
-    return dec;
+function dmsToDec(deg, min, sec, dir) {
+  let val = Math.abs(deg) + (min || 0) / 60 + (sec || 0) / 3600;
+  if (dir === 'S' || dir === 'W') val = -val;
+  return val;
 }
 
-function formatDegrees(deg) {
-    const sign = deg < 0 ? '-' : '';
-    let absDeg = Math.abs(deg);
-    const d = Math.floor(absDeg);
-    const m = Math.floor((absDeg - d) * 60);
-    const s = Math.round(((absDeg - d) * 3600 - m * 60));
-    return `${sign}${d}° ${m}' ${s}"`;
+function formatDMS(angle) {
+  angle = ((angle % 360) + 360) % 360;
+  const d = Math.floor(angle);
+  const m = Math.floor((angle - d) * 60);
+  const s = Math.round(((angle - d) * 3600) - m * 60);
+  return `${d}° ${m}' ${s}"`;
 }
 
-function getZodiacSign(degree) {
-    const signs = [
-        'Áries', 'Touro', 'Gêmeos', 'Câncer', 'Leão', 'Virgem',
-        'Libra', 'Escorpião', 'Sagitário', 'Capricórnio', 'Aquário', 'Peixes'
-    ];
-    let normalizedDegree = degree % 360;
-    if (normalizedDegree < 0) {
-        normalizedDegree += 360;
-    }
-    const signIndex = Math.floor(normalizedDegree / 30);
-    const degreeInSign = normalizedDegree % 30;
-    const minutes = Math.floor((degreeInSign - Math.floor(degreeInSign)) * 60);
-    const seconds = Math.round(((degreeInSign - Math.floor(degreeInSign)) * 60 - minutes) * 60);
-    return `${signs[signIndex]} ${Math.floor(degreeInSign)}° ${minutes}' ${seconds}"`;
+function getZodiacSign(deg) {
+  deg = ((deg % 360) + 360) % 360;
+  const signs = [
+    'Áries','Touro','Gêmeos','Câncer','Leão','Virgem',
+    'Libra','Escorpião','Sagitário','Capricórnio','Aquário','Peixes'
+  ];
+  const index = Math.floor(deg / 30);
+  const degInSign = deg - index * 30;
+  const d = Math.floor(degInSign);
+  const m = Math.floor((degInSign - d) * 60);
+  const s = Math.round(((degInSign - d) * 3600) - m * 60);
+  return { sign: signs[index], formatted: `${signs[index]} ${d}° ${m}' ${s}"` };
 }
 
-function calculateCusps() {
-    // Dados para teste
-    // Sideral Time: 18:57:16
-    // Latitude 23s33'09
-    // Longitude 46w37'29
-
-    const sideralTimeHours = 18 + 57 / 60 + 16 / 3600; // Tempo Sideral em horas
-
-    const latitude = dmsToDec(23, 33, 9, 'S');
-    const longitude = dmsToDec(46, 37, 29, 'W');
-
-    const houseSystem = 'P'; 
-
-    const armc = sideralTimeHours * 15;
-    const obliquity = 23.43650; // Obliquidade da eclíptica
-
-    const houseResult = swe.houses_armc(armc, latitude, obliquity, houseSystem);
-
-    const cusps = houseResult.data.houses;
-    const ascmc = houseResult.data.points;
-
-    console.log('Resultado das Cúspides:');
-    console.log(`Ascendente ${getZodiacSign(ascmc[0])}`);
-    console.log(`Casa 2 ${getZodiacSign(cusps[1])}`);
-    console.log(`Casa 3 ${getZodiacSign(cusps[2])}`);
-    console.log(`Casa 4 ${getZodiacSign(ascmc[1])}`);
-    console.log(`Casa 5 ${getZodiacSign(cusps[4])}`);
-    console.log(`Casa 6 ${getZodiacSign(cusps[5])}`);
-    console.log(`Casa 7 ${getZodiacSign(cusps[6])}`);
-    console.log(`Casa 8 ${getZodiacSign(cusps[7])}`);
-    console.log(`Casa 9 ${getZodiacSign(cusps[8])}`);
-    console.log(`Casa 10 ${getZodiacSign(cusps[9])}`);
-    console.log(`Casa 11 ${getZodiacSign(cusps[10])}`);
-    console.log(`Casa 12 ${getZodiacSign(cusps[11])}`);
+let swe = null;
+try {
+  swe = require('sweph');
+} catch (err) {
+  throw new Error(
+    'Erro ao carregar a biblioteca "sweph". Certifique-se de ter executado: npm install sweph'
+  );
 }
 
-calculateCusps();
+/**
+ * Calcula as cúspides de casas
+ * @param {Object} inputData
+ * @param {Object} inputData.sideralTime {h,m,s}
+ * @param {Object} inputData.latitude {deg,min,sec,dir}
+ * @param {Object} inputData.longitude {deg,min,sec,dir}
+ * @param {Number} inputData.obliquity
+ * @param {String} inputData.houseSystem
+ */
+function calculateCusps(inputData) {
+  const { sideralTime, latitude, longitude, obliquity, houseSystem } = inputData;
+
+  const lstHours = sideralTime.h + sideralTime.m / 60 + sideralTime.s / 3600;
+  const armc = lstHours * 15.0;
+
+  const latDec = dmsToDec(latitude.deg, latitude.min, latitude.sec, latitude.dir);
+
+  let houseResult;
+  if (typeof swe.houses_armc === 'function') {
+    houseResult = swe.houses_armc(armc, latDec, obliquity, houseSystem);
+  } else if (typeof swe.houses === 'function') {
+    // fallback: mas atenção, essa função normalmente precisa de JD
+    houseResult = swe.houses(armc, latDec, obliquity, houseSystem);
+  } else {
+    throw new Error('Função adequada para cálculo de casas não encontrada no sweph.');
+  }
+
+  let cusps = null;
+  let ascmc = null;
+  if (houseResult && houseResult.data) {
+    cusps = houseResult.data.houses || houseResult.data.cusps || houseResult.data;
+    ascmc = houseResult.data.points || houseResult.data.ascmc || houseResult.data.aps;
+  } else if (Array.isArray(houseResult) && houseResult.length >= 12) {
+    cusps = houseResult;
+  } else {
+    throw new Error('Formato inesperado do resultado de swe.houses_armc');
+  }
+
+  if (cusps && cusps.length >= 13) {
+    const normalized = [];
+    for (let i = 1; i <= 12; i++) normalized.push(cusps[i]);
+    cusps = normalized;
+  }
+
+  let ascDeg = null;
+  let mcDeg = null;
+  if (ascmc && ascmc.length >= 2) {
+    ascDeg = ascmc[0];
+    mcDeg = ascmc[1];
+  } else {
+    ascDeg = cusps ? cusps[0] : null;
+    mcDeg = cusps ? cusps[9] : null;
+  }
+
+  return {
+    ascendente: ascDeg != null ? getZodiacSign(ascDeg) : null,
+    mc: mcDeg != null ? getZodiacSign(mcDeg) : null,
+    casas: cusps
+      ? cusps.map((c, i) => ({
+          casa: i + 1,
+          grau: c,
+          signo: getZodiacSign(c)
+        }))
+      : []
+  };
+}
+
+module.exports = calculateCusps;

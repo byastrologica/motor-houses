@@ -1,0 +1,15 @@
+{
+  "name": "motor-houses",
+  "version": "1.0.0",
+  "description": "test houses placidus",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "sweph": "^2.10.3-b-1"
+  }
+}

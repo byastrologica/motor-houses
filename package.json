@@ -1,15 +1,16 @@
 {
   "name": "motor-houses",
   "version": "1.0.0",
-  "description": "test houses placidus",
+  "description": "API para calculo de casas astrologicas",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "express": "^4.19.2",
     "sweph": "^2.10.3-b-1"
   }
 }

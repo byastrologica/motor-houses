@@ -9,11 +9,8 @@
   "scripts": {
     "start": "node index.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "express": "^4.19.2",
-    "sweph": "^2.10.3-b-1"
+    "swisseph": "^0.6.0"
   }
 }

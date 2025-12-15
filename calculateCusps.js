@@ -1,13 +1,10 @@
-// Módulo para cálculo das cúspides usando 'sweph'.
+// Módulo para cálculo das cúspides usando 'swisseph' (versão compatível)
 
-let swe;
+let swisseph;
 try {
-  swe = require('sweph');
+  swisseph = require('swisseph');
 } catch (err) {
-  // Isso vai mostrar o erro real no log do Render se falhar
-  console.error('CRITICAL ERROR: Falha ao carregar a biblioteca sweph.');
-  console.error('Detalhes do erro:', err);
-  console.error('Stack trace:', err.stack);
+  console.error('CRITICAL ERROR: Falha ao carregar a biblioteca swisseph.');
   throw err; 
 }
 
@@ -41,41 +38,43 @@ function getZodiacSign(deg) {
  * @param {Object} inputData
  */
 function calculateCusps(inputData) {
-  // Define o caminho para os arquivos de efemérides (se necessário, o padrão costuma funcionar)
-  // swe.set_ephe_path(__dirname + '/ephe'); 
-
   const { sideralTime, latitude, longitude, obliquity, houseSystem } = inputData;
 
+  // Converter Tempo Sideral para horas decimais
   const lstHours = sideralTime.h + sideralTime.m / 60 + sideralTime.s / 3600;
-  const armc = lstHours * 15.0;
-  const latDec = dmsToDec(latitude.deg, latitude.min, latitude.sec, latitude.dir);
-  const hSys = houseSystem || 'P'; 
-
-  let houseResult;
   
-  if (typeof swe.houses_armc === 'function') {
-    houseResult = swe.houses_armc(armc, latDec, obliquity, hSys);
-  } else {
-    houseResult = swe.houses(armc, latDec, obliquity, hSys);
+  // Converter para ARMC (Ascensão Reta do Meio do Céu) - Multiplica por 15
+  const armc = lstHours * 15.0;
+
+  // Converter Latitude para decimal
+  const latDec = dmsToDec(latitude.deg, latitude.min, latitude.sec, latitude.dir);
+
+  // Define o sistema de casas (P = Placidus)
+  // A biblioteca swisseph usa o código ASCII da letra
+  const hSys = houseSystem ? houseSystem.charAt(0) : 'P'; 
+
+  // Variáveis para armazenar o resultado da biblioteca
+  let housesResult = null;
+  let ascmcResult = null;
+
+  // A função swe_houses_armc da biblioteca swisseph funciona via callback
+  // mas roda de forma síncrona, então podemos capturar as variáveis direto.
+  swisseph.swe_houses_armc(armc, latDec, obliquity, hSys, function(result) {
+      if (result && result.house) {
+          housesResult = result.house; // Array com as casas
+          ascmcResult = result.ascmc;  // Array com Ascendente, MC, etc.
+      }
+  });
+
+  if (!housesResult) {
+      throw new Error('Erro: A biblioteca swisseph não retornou dados.');
   }
 
-  let cusps = null;
-  let ascmc = null;
-
-  if (houseResult && houseResult.data) {
-     cusps = houseResult.data.houses || houseResult.data.cusps;
-     ascmc = houseResult.data.points || houseResult.data.ascmc;
-  } else if (Array.isArray(houseResult)) {
-     cusps = houseResult;
-  }
-
-  if (!cusps) {
-      throw new Error('Não foi possível calcular as casas (retorno vazio do sweph).');
-  }
-
+  // Normalizar array de cúspides 
+  // O swisseph retorna um array de 13 itens (índice 0 é vazio, casas são 1 a 12)
   const casasFinais = [];
   for (let i = 1; i <= 12; i++) {
-      let grau = cusps[i] !== undefined ? cusps[i] : cusps[i-1];
+      let grau = housesResult[i];
       casasFinais.push({
           casa: i,
           grau: grau,
@@ -83,16 +82,9 @@ function calculateCusps(inputData) {
       });
   }
 
-  let asc = null;
-  let mc = null;
-  
-  if (ascmc && ascmc.length >= 2) {
-      asc = ascmc[0];
-      mc = ascmc[1];
-  } else {
-      asc = casasFinais[0].grau; 
-      mc = casasFinais[9].grau; 
-  }
+  // Extrair Ascendente (índice 0) e MC (índice 1) do array ascmc
+  let asc = ascmcResult ? ascmcResult[0] : casasFinais[0].grau;
+  let mc = ascmcResult ? ascmcResult[1] : casasFinais[9].grau;
 
   return {
     ascendente: getZodiacSign(asc),
